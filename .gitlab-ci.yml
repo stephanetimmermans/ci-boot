@@ -22,12 +22,33 @@ maven-build:
 docker-build:
   stage: package
   script:
+  #Docker Hub
   - docker build -t akala/ci-boot .
   - docker login -u $DOCKERHUB_USER -p $DOCKERHUB_PASSWORD
-#  - docker login -u gitlab-ci-token -p $DOCKERHUB_PASSWORD registry.gitlab.com
+  - docker push akala/ci-boot
+  #Private Docker Registry
+  - docker build -t akala/ci-boot .
+  - docker login -u $PRIVATE_REGISTRY_USER -p $PRIVATE_REGISTRY_PASSWORD $PRIVATE_REGISTRY_URL
   - docker push akala/ci-boot
 
 k8s-deploy:
+  image: google/cloud-sdk
+  stage: deploy
+  script:
+#  - kubectl delete secret registry.gitlab.com
+#  - kubectl create secret docker-registry registry.gitlab.com --docker-server=https://registry.gitlab.com --docker-username=marcolenzo --docker-password=$REGISTRY_PASSWD --docker-email=lenzo.marco@gmail.com
+  - kubectl delete deployment ci-boot --ignore-not-found
+  - kubectl delete service ci-boot --ignore-not-found
+  - kubectl apply -f deployment.yml
+  - kubectl expose deployment ci-boot --port=80 --target-port=8080 --type=LoadBalancer
+  #- kubectl rolling-update ci-boot -f deployment.yml
+  environment:
+    name: staging
+    url: https://example.staging.com
+  only:
+  - master
+
+k8s-deploy-production:
   image: google/cloud-sdk
   stage: deploy
   script:
@@ -46,4 +67,10 @@ k8s-deploy:
   - kubectl expose deployment ci-boot --port=80 --target-port=8080 --type=LoadBalancer
   #- kubectl rolling-update ci-boot -f deployment.yml
 
+  environment:
+    name: production
+    url: https://example.production.com
+  when: manual
+  only:
+  - master
 
