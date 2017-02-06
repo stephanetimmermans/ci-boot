@@ -1,0 +1,49 @@
+image: docker:latest
+services:
+  - docker:dind
+
+variables:
+  DOCKER_DRIVER: overlay
+#  SPRING_PROFILES_ACTIVE: gitlab-ci
+
+stages:
+  - build
+  - package
+  - deploy
+
+maven-build:
+  image: maven:3-jdk-8
+  stage: build
+  script: "mvn package -B"
+  artifacts:
+    paths:
+      - target/*.jar
+
+docker-build:
+  stage: package
+  script:
+  - docker build -t akala/ci-boot .
+  - docker login -u $DOCKERHUB_USER -p $DOCKERHUB_PASSWORD
+#  - docker login -u gitlab-ci-token -p $DOCKERHUB_PASSWORD registry.gitlab.com
+  - docker push akala/ci-boot
+
+k8s-deploy:
+  image: google/cloud-sdk
+  stage: deploy
+  script:
+  - echo "$GOOGLE_CLOUD_KEY" > key.json
+  - gcloud auth activate-service-account --key-file key.json
+  - gcloud config set compute/zone europe-west1-c
+  - gcloud config set project ci-boot-157313
+  - gcloud config set container/use_client_certificate True
+  - gcloud container clusters get-credentials ci-boot
+#OR- gcloud container clusters get-credentials ci-boot --zone europe-west1-c --project ci-boot-157313
+#  - kubectl delete secret registry.gitlab.com
+#  - kubectl create secret docker-registry registry.gitlab.com --docker-server=https://registry.gitlab.com --docker-username=marcolenzo --docker-password=$REGISTRY_PASSWD --docker-email=lenzo.marco@gmail.com
+  - kubectl delete deployment ci-boot --ignore-not-found
+  - kubectl delete service ci-boot --ignore-not-found
+  - kubectl apply -f deployment.yml
+  - kubectl expose deployment ci-boot --port=80 --target-port=8080 --type=LoadBalancer
+  #- kubectl rolling-update ci-boot -f deployment.yml
+
+

@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: ci-boot
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: ci-boot
+    spec:
+      containers:
+      - name: ci-boot
+        image: akala/ci-boot
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+#      imagePullSecrets:
+#        - name: registry.gitlab.com
